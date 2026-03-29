@@ -1,0 +1,5 @@
+# requirements.txt
+requests>=2.25.1
+numpy>=1.20.0
+matplotlib>=3.3.0
+randcrack>=0.1.0

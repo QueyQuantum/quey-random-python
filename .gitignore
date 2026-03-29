@@ -1,0 +1,9 @@
+# .gitignore
+__pycache__/
+*.pyc
+.DS_Store
+.env
+serviceAccountKey.json
+quey_api.key
+venv/
+*.swp
