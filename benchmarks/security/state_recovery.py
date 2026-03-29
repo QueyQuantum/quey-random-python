@@ -4,8 +4,7 @@ from randcrack import RandCrack
 from quey_random import QueyRandom
 
 # WARNING: Replace with your actual Quey Cloud API Key
-QUEY_API_KEY = "qu_cloud_a98a2381c2bc280f24eed7ca90700bf0bf7d75152de979ee7d7d51746f60541b"
-
+QUEY_API_KEY = "YOUR_API_KEY"
 def hack_standard_prng():
     """
     Demonstrates how standard PRNGs (Mersenne Twister) can be 100% predicted
