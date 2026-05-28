@@ -1,61 +1,119 @@
-# Quey: Cloud Quantum RNG for Python
+# Quey Python SDK
 
-Standard Pseudo-Random Number Generators (like Python's Mersenne Twister or Numpy's PCG64) are great for everyday tasks. But when running massive Monte Carlo simulations or cryptographic key derivations, two fundamental issues arise:
+Verifiable randomness from a physical entropy source.
 
-1.  **Parallel Seed Collisions:** Spawning multiple cloud workers often results in identical time-based seeds, silently ruining the statistical variance of parallel simulations.
-2.  **Predictability:** Standard PRNGs are deterministic. In security-sensitive workflows, observing enough outputs allows complete state recovery.
+[queyquantum.io](https://queyquantum.io) · [Documentation](https://queyquantum.io/documentation) · [Verify a draw](https://queyquantum.io/verify/89421ffc-6af3-427e-8123-fa6c799cc166)
 
-Quey was built to solve this. It provides true, unseeded physical randomness that scales effortlessly across parallel computing clusters.
+---
 
-## How it works
+## What is Quey?
 
-Quey operates on a proprietary Edge-to-Cloud infrastructure. Dedicated hardware nodes, isolated in absolute darkness, continuously harvest true quantum shot noise (dark current) from optical sensors. 
+Quey extracts true randomness from photonic shot noise — a measurable physical process, not an algorithm. The entropy is captured by a dedicated hardware node (Raspberry Pi 5 + NoIR camera in an isolated enclosure), processed through an extraction pipeline (LSB extraction → Von Neumann debiasing → SHA3-256 hashing), and served via a REST API.
 
-This raw physical entropy is cryptographically whitened (SHA-256) to guarantee mathematical uniformity, chunked, and pushed to a highly available NoSQL Cloud Buffer. The `quey-random` Python SDK allows your applications to pull this pure entropy instantly.
+Every selection can be signed with Ed25519 and published to a verification page anyone can check in their browser — trustlessly, via WebCrypto, with no server call required.
 
-**Zero seeds. True physical independence.**
+**Validation:** NIST SP 800-90B (min-entropy: 0.6236 bits/bit) · NIST SP 800-22 (188/188 sub-tests passed) · Shannon entropy: 7.999994 bits/byte.
+
+---
 
 ## Installation
 
 ```bash
 pip install quey-random
 ```
-(Optional) Install numpy for vectorized scientific arrays:
+
+Optional, for NumPy array methods:
+
 ```bash
 pip install numpy
 ```
-## Benchmarks & Proofs of Concept
-I built this to solve my own simulation issues, so I benchmarked it strictly against Numpy. You can find the raw scripts in the benchmarks/ folder.
 
-### 1. The HPC Seed Collision Problem
-If you spawn parallel workers requesting random numbers simultaneously, standard PRNGs often collide. Quey pulls fundamentally independent physical entropy from the cloud, making seed collision mathematically impossible.
-
-### 2. State Recovery Attack (Security)
-Using the randcrack library, we simulated an attacker observing 624 32-bit outputs to reverse-engineer the generator's matrix.
-Python's Mersenne Twister: 100% predictable after observation.
-Quey Quantum Entropy: 0% predictable (it's physical noise, not an algorithm).
-
-### 3. Physical Neutrality (Ising Model)
-To prove the hardware sensor introduces zero thermal bias, we ran a Metropolis algorithm on a 16x16 grid. Quey perfectly reproduced the theoretical phase transition ($T_c \approx 2.269$), matching Numpy's statistical robustness but with true quantum data.
+---
 
 ## Quick Start
-Get your free API key at queyquantum.io and set it as an environment variable (QUEY_API_KEY).
 
-```Python
+```python
 from quey_random import QueyRandom
 
-quey = QueyRandom(api_key="your_api_key")
+# Reads QUEY_API_KEY from environment if not provided
+qr = QueyRandom()
 
-# 1. Standard usage
-val = quey.random()
-print(f"True random float: {val}")
+# Random float in [0, 1)
+value = qr.random()
+print(value)  # 0.7391042...
 
-# 2. Vectorized Numpy usage (optimized network fetching)
-matrix = quey.uniform_array((1000, 1000))
+# Raw entropy bytes
+entropy = qr.get_bytes(32)
 
-# 3. Cryptographic Key Derivation (HKDF RFC 5869)
-secure_key = quey.hkdf_derive(length=32, info=b"database_encryption")
+# Pick a winner from a list
+participants = ["Alice", "Bob", "Charlie", "Diana", "Eve"]
+winner = qr.choice(participants)
+print(f"Winner: {winner}")
 ```
 
-### Architecture Notes
-The edge node extraction engine (written in pure C) and backend routing remain closed-source to protect the infrastructure, but this SDK and the benchmark scripts are fully open for peer review.
+Or with an explicit API key:
+
+```python
+qr = QueyRandom(api_key="qu_cloud_xxxxxxxxxxxxxxxx")
+```
+
+---
+
+## API Reference
+
+### `QueyRandom(api_key=None, base_url=None)`
+
+Creates a client. If `api_key` is omitted, reads from the `QUEY_API_KEY` environment variable.
+
+### Methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `random()` | `float` | Random float in [0, 1) |
+| `get_bytes(length)` | `bytes` | Raw physical entropy |
+| `choice(seq)` | `T` | Random element from a sequence |
+| `randbelow(n)` | `int` | Random integer in [0, n) |
+| `uniform_array(shape)` | `np.ndarray` | Uniform [0, 1) array — requires NumPy |
+| `normal_array(shape, loc=0.0, scale=1.0)` | `np.ndarray` | Normal distribution array — requires NumPy |
+| `mixed_entropy(length)` | `bytes` | Mixed local + cloud entropy |
+| `hkdf_derive(length, info=b'', salt=None, input_entropy_length=32)` | `bytes` | HKDF key derivation from physical entropy |
+
+### Exceptions
+
+| Exception | When |
+|---|---|
+| `AuthenticationError` | Invalid or missing API key |
+| `QuotaExceededError` | Monthly quota exceeded |
+| `MissingDependencyError` | NumPy not installed (for array methods) |
+| `QueyAPIError` | Base exception for other API errors |
+
+---
+
+## Verifiable Draws
+
+Quey can produce cryptographically signed selections via the [Verifiable Draw API](https://queyquantum.io/documentation):
+
+1. Winners are selected using rejection sampling — never biased modulo
+2. The result is signed with Ed25519
+3. A certificate is published to a public verification page
+
+Anyone can verify the draw in their browser via WebCrypto — no server call, no trust in Quey required.
+
+**See a real verified draw →** [queyquantum.io/verify/89421ffc-...](https://queyquantum.io/verify/89421ffc-6af3-427e-8123-fa6c799cc166)
+
+---
+
+
+## Architecture
+
+This SDK connects to Quey's cloud buffer, which is continuously fed by a dedicated hardware node running a C extraction engine (closed-source). The extraction pipeline processes photonic shot noise through LSB extraction, Von Neumann debiasing, and SHA3-256 cryptographic hashing. This SDK and the benchmark scripts in this repository are fully open for review.
+
+---
+
+## Links
+
+- **Website:** [queyquantum.io](https://queyquantum.io)
+- **Documentation:** [queyquantum.io/documentation](https://queyquantum.io/documentation)
+- **NIST Validation:** [queyquantum.io/stats](https://queyquantum.io/stats)
+- **Verify a Draw:** [queyquantum.io/verify/89421ffc-...](https://queyquantum.io/verify/89421ffc-6af3-427e-8123-fa6c799cc166)
+- **Node.js SDK:** `npm install quey-random`
