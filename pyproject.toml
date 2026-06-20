@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quey-random"
 version = "1.0.3"
-description = "Python SDK for Quey — verifiable randomness from a physical entropy source. NIST-validated, Ed25519-signed draws."
+description = "Python SDK for Quey — true physical randomness from photonic shot noise. Raw entropy and Ed25519-signed verifiable draws, NIST-validated."
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
